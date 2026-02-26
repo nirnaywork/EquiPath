@@ -29,15 +29,27 @@ export default function RemindersPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
+        // ── Fast path: user already cached by Firebase SDK ──
+        const cached = auth.currentUser;
+        if (cached) {
+            setUser(cached);
+            fetchReminders(cached.uid);
+        }
+
+        // ── Slow path: hydrate session on cold start ──
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                fetchReminders(currentUser.uid);
+                // Only fetch if we didn't already do it in the fast path
+                if (!auth.currentUser || !cached) {
+                    fetchReminders(currentUser.uid);
+                }
             } else {
                 setIsLoading(false);
             }
         });
         return () => unsubscribe();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchReminders = async (userId: string) => {
@@ -109,14 +121,6 @@ export default function RemindersPage() {
             console.error("Error deleting reminder: ", error);
         }
     };
-
-    if (isLoading) {
-        return (
-            <div className="flex h-[80vh] items-center justify-center">
-                <Loader2 className="h-12 w-12 animate-spin text-violet-500" />
-            </div>
-        );
-    }
 
     if (!user && !isLoading) {
         return (
@@ -203,7 +207,17 @@ export default function RemindersPage() {
                         </p>
                     </div>
 
-                    {reminders.length === 0 ? (
+                    {isLoading ? (
+                        /* Skeleton cards while Firestore loads */
+                        <div className="grid gap-4">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="glass p-6 rounded-2xl animate-pulse">
+                                    <div className="h-5 w-2/5 bg-white/10 rounded-lg mb-3" />
+                                    <div className="h-4 w-1/4 bg-white/5 rounded-lg" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : reminders.length === 0 ? (
                         <div className="glass p-12 rounded-3xl text-center border-dashed border-2 border-white/10 flex flex-col items-center justify-center">
                             <Calendar className="h-12 w-12 text-foreground/20 mb-4" />
                             <h3 className="text-xl font-bold text-foreground/50">Your schedule is clear</h3>

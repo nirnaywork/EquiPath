@@ -19,7 +19,8 @@ export default function RoadmapsPage() {
     const [year, setYear] = useState<string | null>(null);
     const [domain, setDomain] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [roadmapData, setRoadmapData] = useState<Record<string, unknown> | null>(null); // To store Gemini response
+    const [roadmapData, setRoadmapData] = useState<Record<string, unknown> | null>(null);
+    const [apiError, setApiError] = useState<string | null>(null);
 
     const handleNextStep = () => {
         if (step === 1 && year) setStep(2);
@@ -28,7 +29,8 @@ export default function RoadmapsPage() {
     const handleGenerate = async (selectedDomain: string) => {
         setDomain(selectedDomain);
         setIsLoading(true);
-        setStep(3); // Move to loading/result view
+        setApiError(null);
+        setStep(3);
 
         try {
             const res = await fetch("/api/roadmap", {
@@ -37,14 +39,18 @@ export default function RoadmapsPage() {
                 body: JSON.stringify({ year, domain: selectedDomain })
             });
 
+            const data = await res.json();
+
             if (!res.ok) {
-                throw new Error("Failed to generate roadmap from server");
+                // Show the actual server error message (e.g. rate limit, bad key, etc.)
+                throw new Error(data.details || data.error || "Failed to generate roadmap from server");
             }
 
-            const data = await res.json();
             setRoadmapData(data);
         } catch (error) {
-            console.error(error);
+            const msg = error instanceof Error ? error.message : String(error);
+            console.error("Roadmap error:", msg);
+            setApiError(msg);
         } finally {
             setIsLoading(false);
         }
@@ -71,12 +77,21 @@ export default function RoadmapsPage() {
                             <button
                                 key={y}
                                 onClick={() => setYear(y)}
-                                className={`glass flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 transition-all hover:scale-[1.02] ${year === y
-                                    ? "border-accent bg-accent/10 shadow-[0_0_20px_rgba(196,154,108,0.2)]"
-                                    : "border-transparent hover:border-accent/40 hover:bg-white/5"
+                                className={`relative flex h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 transition-all duration-200 backdrop-blur-sm ${year === y
+                                    ? "border-accent bg-accent/15 shadow-[0_0_32px_rgba(200,169,110,0.35)] scale-[1.04]"
+                                    : "border-white/8 bg-white/3 hover:border-accent/40 hover:bg-white/6 hover:scale-[1.02]"
                                     }`}
                             >
-                                <div className="text-lg font-bold">{y}</div>
+                                {year === y && (
+                                    <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-accent flex items-center justify-center">
+                                        <svg className="w-3 h-3 text-background" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </span>
+                                )}
+                                <div className={`text-lg font-bold transition-colors duration-200 ${year === y ? "text-accent" : "text-foreground/70"}`}>
+                                    {y}
+                                </div>
                             </button>
                         ))}
                     </div>
@@ -149,6 +164,18 @@ export default function RoadmapsPage() {
                         </div>
                     ) : (
                         <div className="w-full">
+                            {apiError && (
+                                <div className="glass rounded-2xl border border-red-500/30 bg-red-500/5 p-6 text-center">
+                                    <p className="text-red-400 font-bold mb-2">Generation Failed</p>
+                                    <p className="text-sm text-red-300/80 font-mono break-words">{apiError}</p>
+                                    <button
+                                        onClick={() => { setStep(2); setApiError(null); }}
+                                        className="mt-4 text-sm text-accent hover:underline"
+                                    >
+                                        ← Try again
+                                    </button>
+                                </div>
+                            )}
                             {roadmapData && <RoadmapDisplay data={roadmapData} onReset={() => { setStep(1); setYear(null); setDomain(null); setRoadmapData(null); }} />}
                         </div>
                     )}
