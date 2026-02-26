@@ -1,0 +1,71 @@
+﻿node : GoogleGenerative
+AIFetchError: 
+[GoogleGenerativeAI 
+Error]: Error fetching 
+from https://generative
+language.googleapis.com
+/v1beta/models/gemini-1
+.5-flash:generateConten
+t: [404 Not Found] mode
+ls/gemini-1.5-flash is 
+not found for API 
+version v1beta, or is 
+not supported for 
+generateContent. Call 
+ListModels to see the 
+list of available 
+models and their 
+supported methods.
+At line:1 char:1
++ node --env-file=.env 
+direct-test.js > 
+api-err.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (GoogleGenerat   
+ iv...ported method    
+s.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+    at 
+handleResponseNotOk (C:
+\Users\nirna\Documents\
+Machine Learning\EquiPa
+th\node_modules\@google
+\generative-ai\dist\ind
+ex.js:434:11)
+    at process.processT
+icksAndRejections (node
+:internal/process/task_
+queues:103:5)
+    at async 
+makeRequest (C:\Users\n
+irna\Documents\Machine 
+Learning\EquiPath\node_
+modules\@google\generat
+ive-ai\dist\index.js:40
+3:9)
+    at async 
+generateContent (C:\Use
+rs\nirna\Documents\Mach
+ine Learning\EquiPath\n
+ode_modules\@google\gen
+erative-ai\dist\index.j
+s:867:22)
+    at async test (C:\U
+sers\nirna\Documents\Ma
+chine Learning\EquiPath
+\direct-test.js:11:24) 
+{
+  status: 404,
+  statusText: 'Not 
+Found',
+  errorDetails: 
+undefined
+}

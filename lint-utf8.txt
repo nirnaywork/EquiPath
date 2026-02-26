@@ -1,0 +1,14 @@
+﻿
+> temp-equipath@0.1.0 lint
+> eslint
+
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\components\AuthCard.tsx
+  6:10  warning  'collection' is defined but never used  @typescript-eslint/no-unused-vars
+  8:22  warning  'UserIcon' is defined but never used    @typescript-eslint/no-unused-vars
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\components\RoadmapDisplay.tsx
+  4:82  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 3 problems (1 error, 2 warnings)
+

@@ -1,0 +1,34 @@
+﻿
+> temp-equipath@0.1.0 lint
+> eslint
+
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\app\api\jobs\route.ts
+  38:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\app\api\reminders\route.ts
+  30:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  88:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\app\api\roadmap\route.ts
+  45:18  warning  'parseError' is defined but never used    @typescript-eslint/no-unused-vars
+  49:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\app\internships\page.tsx
+  187:78  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  255:52  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  255:64  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\app\reminders\page.tsx
+  128:17  error  Do not use an `<a>` element to navigate to `/`. Use `<Link />` from `next/link` instead. See: https://nextjs.org/docs/messages/no-html-link-for-pages  @next/next/no-html-link-for-pages
+  142:23  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                        react/no-unescaped-entities
+
+C:\Users\nirna\Documents\Machine Learning\EquiPath\src\components\RoadmapDisplay.tsx
+    4:82  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   14:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   52:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   85:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  123:57  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 15 problems (14 errors, 1 warning)
+
