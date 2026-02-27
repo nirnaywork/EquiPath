@@ -2,10 +2,12 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Compass, Briefcase, Bell, Calendar, LogOut, User as UserIcon, Pencil, Check, X, ChevronDown } from "lucide-react";
+import { Compass, Briefcase, Bell, CalendarClock, LogOut, User as UserIcon, Pencil, Check, X, ChevronDown } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
+import { getCalendarEvents } from "@/lib/calendar";
+import { getCachedUsername, setCachedUsername, clearUserCache, fetchUsernameOnce } from "@/lib/userCache";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, getDocFromCache, updateDoc, setDoc } from "firebase/firestore";
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -45,12 +47,28 @@ export default function Navbar() {
             setUser(currentUser);
             if (currentUser) {
                 setIsGuest(false);
+                // Instant display from cache (no network)
+                const cachedName = getCachedUsername(currentUser.uid);
+                if (cachedName) setUsername(cachedName);
+                else if (currentUser.displayName) setUsername(currentUser.displayName);
+                else if (currentUser.email) setUsername(emailFallback(currentUser.email));
+                else setUsername("Student");
+
+                // Single coalesced Firestore read — cache-first when available
                 try {
-                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-                    if (userDoc.exists() && userDoc.data().username) setUsername(userDoc.data().username);
-                    else if (currentUser.displayName) setUsername(currentUser.displayName);
-                    else if (currentUser.email) setUsername(emailFallback(currentUser.email));
-                    else setUsername("Student");
+                    const name = await fetchUsernameOnce(currentUser.uid, async () => {
+                        const userRef = doc(db, "users", currentUser.uid);
+                        try {
+                            const cached = await getDocFromCache(userRef);
+                            if (cached.exists() && cached.data().username) return cached.data().username;
+                        } catch { /* no cache */ }
+                        const userDoc = await getDoc(userRef);
+                        if (userDoc.exists() && userDoc.data().username) return userDoc.data().username;
+                        if (currentUser.displayName) return currentUser.displayName;
+                        if (currentUser.email) return emailFallback(currentUser.email);
+                        return "Student";
+                    });
+                    if (name) setUsername(name);
                 } catch {
                     if (currentUser.displayName) setUsername(currentUser.displayName);
                     else if (currentUser.email) setUsername(emailFallback(currentUser.email));
@@ -60,7 +78,10 @@ export default function Navbar() {
                 const guestMode = typeof window !== "undefined" && localStorage.getItem("guestMode") === "true";
                 setIsGuest(guestMode);
                 if (guestMode) setUsername("Guest");
-                else setUsername("");
+                else {
+                    setUsername("");
+                    clearUserCache();
+                }
             }
         });
         return () => unsubscribe();
@@ -78,6 +99,7 @@ export default function Navbar() {
 
     const handleLogout = async () => {
         localStorage.removeItem("guestMode");
+        clearUserCache();
         await signOut(auth);
         router.push("/");
     };
@@ -96,6 +118,7 @@ export default function Navbar() {
             const snap = await getDoc(userRef);
             if (snap.exists()) await updateDoc(userRef, { username: editValue.trim() });
             else await setDoc(userRef, { username: editValue.trim(), email: user.email, createdAt: new Date().toISOString() });
+            setCachedUsername(user.uid, editValue.trim());
             setUsername(editValue.trim());
             setEditMode(false);
             setDropdownOpen(false);
@@ -106,11 +129,15 @@ export default function Navbar() {
     const openEdit = () => { setEditValue(username); setEditMode(true); };
 
     const links = [
+        { href: "/calendar", label: "Calendar", icon: CalendarClock },
         { href: "/roadmaps", label: "Roadmaps", icon: Compass },
         { href: "/internships", label: "Internships", icon: Briefcase },
-        { href: "/reminders", label: "Remind Me", icon: Bell },
-        { href: "/scheduler", label: "Scheduler", icon: Calendar },
     ];
+
+    const prefetchCalendar = () => {
+        const u = auth.currentUser;
+        if (u) getCalendarEvents(u.uid).catch(() => { });
+    };
 
     return (
         <nav className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled
@@ -135,6 +162,7 @@ export default function Navbar() {
                             <Link
                                 key={link.href}
                                 href={link.href}
+                                onMouseEnter={link.href === "/calendar" ? prefetchCalendar : undefined}
                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
                                     ? "text-accent bg-accent/10"
                                     : "text-foreground/60 hover:text-foreground hover:bg-white/5"
@@ -213,16 +241,16 @@ export default function Navbar() {
                             )}
                         </div>
                     ) : isGuest ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-4">
                             <span className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-foreground/40 border border-white/8">
                                 <UserIcon className="w-3 h-3" /> Guest
                             </span>
-                            <button onClick={handleExitGuest} className="btn-primary text-xs px-4 py-2">
+                            <button onClick={handleExitGuest} className="btn-primary text-xs px-5 py-2">
                                 Sign In
                             </button>
                         </div>
                     ) : (
-                        <Link href="/" className="btn-primary text-xs px-5 py-2">
+                        <Link href="/?login=true" onClick={() => localStorage.removeItem("guestMode")} className="btn-primary text-xs px-5 py-2">
                             Sign In
                         </Link>
                     )}

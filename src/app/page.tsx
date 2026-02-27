@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthCard from "@/components/AuthCard";
 import { X, Compass, Briefcase, Bell, CalendarClock, ArrowRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
@@ -11,18 +11,16 @@ const stats = [
   { value: "AI", label: "Powered Roadmaps" },
   { value: "100%", label: "Free Forever" },
   { value: "Live", label: "Job Listings" },
-  { value: "24h", label: "Deadline Alerts" },
 ];
 
 const features = [
   { icon: Compass, label: "Custom Roadmaps", color: "text-accent" },
   { icon: Briefcase, label: "Internships & Jobs", color: "text-blue-400" },
-  { icon: Bell, label: "Smart Reminders", color: "text-violet-400" },
-  { icon: CalendarClock, label: "AI Scheduler", color: "text-emerald-400" },
 ];
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -37,8 +35,14 @@ export default function Home() {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user) router.replace("/dashboard");
     });
+
+    // Auto-open modal if requested via URL
+    if (searchParams.get("login") === "true") {
+      setModalOpen(true);
+    }
+
     return () => unsub();
-  }, [router]);
+  }, [router, searchParams]);
 
   const openModal = () => setModalOpen(true);
   const closeModal = () => setModalOpen(false);
@@ -91,7 +95,7 @@ export default function Home() {
         {/* Subtext + CTA row */}
         <div className="flex flex-col sm:flex-row sm:items-end gap-8 mb-16">
           <p className="text-base sm:text-lg text-foreground/50 max-w-md leading-relaxed">
-            Roadmaps, job listings, smart reminders, and an AI scheduler — all built for CS students.
+            Personalized roadmaps and live internship listings — built for CS students.
             <span className="text-foreground/80 font-medium"> No paywalls. Ever.</span>
           </p>
           <div className="flex items-center gap-4 flex-shrink-0">
@@ -140,6 +144,51 @@ export default function Home() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ── The Core Feature ── */}
+      <section className="border-t border-white/6 py-24 px-6 sm:px-12 lg:px-20 bg-[#111111]/30">
+        <div className="max-w-[1000px] mx-auto flex flex-col items-center text-center">
+          <span className="section-label px-4 py-2 rounded-full border border-blue-500/20 bg-blue-500/10 mb-6 text-blue-400">
+            The Core Feature
+          </span>
+
+          <h2 className="text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.05] mb-6" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}>
+            Smart Calendar &<br />
+            <span className="text-gradient">Reminder Engine</span>
+          </h2>
+
+          <h3 className="text-xl sm:text-2xl font-bold text-foreground/90 mb-4" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
+            A centralised AI-powered academic calendar that:
+          </h3>
+
+          <p className="text-lg text-foreground/50 max-w-2xl mb-12">
+            Tracks exams, scholarships, internships, & hackathons. Sends timely, intelligent reminders so you never drop the ball.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
+            <div className="glass-hover rounded-3xl p-8 flex flex-col items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-400">
+                <X className="h-5 w-5" />
+              </div>
+              <p className="font-semibold">Prevents missed exams</p>
+            </div>
+
+            <div className="glass-hover rounded-3xl p-8 flex flex-col items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-400">
+                <X className="h-5 w-5" />
+              </div>
+              <p className="font-semibold">Prevents missed deadlines</p>
+            </div>
+
+            <div className="glass-hover rounded-3xl p-8 flex flex-col items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                <X className="h-5 w-5" />
+              </div>
+              <p className="font-semibold">Prevents last-minute panic</p>
+            </div>
+          </div>
         </div>
       </section>
 

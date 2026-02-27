@@ -2,11 +2,11 @@
 
 @theme {
   /* ── Core Palette ── */
-  --color-background: #0A0A0A;
-  --color-surface: #111111;
-  --color-surface-2: #1A1A1A;
-  --color-foreground: #F2F2F2;
-  --color-foreground-muted: rgba(242, 242, 242, 0.5);
+  --color-background: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-2: #141414;
+  --color-foreground: #FFFFFF;
+  --color-foreground-muted: rgba(255, 255, 255, 0.5);
   --color-border: rgba(255, 255, 255, 0.08);
 
   /* ── Brand Accent: warm gold → upgraded to a crisp amber-gold ── */
@@ -139,7 +139,7 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #0A0A0A;
+    background: #000000;
   }
 
   ::-webkit-scrollbar-thumb {
@@ -154,7 +154,7 @@
   /* Selection */
   ::selection {
     background: rgba(200, 169, 110, 0.25);
-    color: #F2F2F2;
+    color: #FFFFFF;
   }
 }
 
@@ -248,7 +248,7 @@
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-sm transition-all duration-200;
     background: var(--color-accent);
-    color: #0A0A0A;
+    color: #000000;
   }
 
   .btn-primary:hover {
@@ -294,7 +294,7 @@
   }
 
   .input-field::placeholder {
-    color: rgba(242, 242, 242, 0.3);
+    color: rgba(255, 255, 255, 0.35);
   }
 
   .input-field:focus {

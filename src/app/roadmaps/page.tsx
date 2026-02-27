@@ -42,8 +42,10 @@ export default function RoadmapsPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                // Show the actual server error message (e.g. rate limit, bad key, etc.)
-                throw new Error(data.details || data.error || "Failed to generate roadmap from server");
+                const message = data.quotaExceeded
+                    ? "Daily AI limit reached. Try again tomorrow or check your Gemini API plan."
+                    : (data.details || data.error || "Failed to generate roadmap");
+                throw new Error(message);
             }
 
             setRoadmapData(data);
@@ -167,7 +169,7 @@ export default function RoadmapsPage() {
                             {apiError && (
                                 <div className="glass rounded-2xl border border-red-500/30 bg-red-500/5 p-6 text-center">
                                     <p className="text-red-400 font-bold mb-2">Generation Failed</p>
-                                    <p className="text-sm text-red-300/80 font-mono break-words">{apiError}</p>
+                                    <p className="text-sm text-red-300/80 max-w-md mx-auto">{apiError}</p>
                                     <button
                                         onClick={() => { setStep(2); setApiError(null); }}
                                         className="mt-4 text-sm text-accent hover:underline"

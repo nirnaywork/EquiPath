@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { setCachedUsername } from "@/lib/userCache";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { User, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
@@ -31,6 +32,7 @@ export default function AuthCard() {
                 await setDoc(doc(db, "users", cred.user.uid), {
                     username: username.trim(), email, createdAt: new Date().toISOString()
                 });
+                setCachedUsername(cred.user.uid, username.trim());
             }
             router.push("/dashboard");
         } catch (err: unknown) {
@@ -60,6 +62,7 @@ export default function AuthCard() {
                         username: derivedName || "Google User", email: cred.user.email, createdAt: new Date().toISOString()
                     });
                 }
+                setCachedUsername(cred.user.uid, derivedName || "Google User");
             } catch { /* offline — skip */ }
 
             router.push("/dashboard");

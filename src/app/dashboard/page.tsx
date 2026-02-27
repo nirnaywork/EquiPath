@@ -3,21 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
+import { getCachedUsername, fetchUsernameOnce } from "@/lib/userCache";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, getDocFromCache } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { CalendarClock, Compass, Briefcase, ArrowRight } from "lucide-react";
 
 const features = [
     {
-        href: "/scheduler",
+        href: "/calendar",
         icon: CalendarClock,
-        label: "Smart Scheduler",
-        description: "AI-powered weekly plan built around your deadlines, energy, and goals.",
-        color: "text-accent",
-        border: "hover:border-accent/30",
-        bg: "bg-accent/10",
-        glow: "hover:shadow-[0_8px_48px_rgba(200,169,110,0.15)]",
+        label: "Smart Calendar",
+        description: "AI-powered tracker for exams, deadlines, and smart email reminders.",
+        color: "text-red-400",
+        border: "hover:border-red-400/30",
+        bg: "bg-red-500/10",
+        glow: "hover:shadow-[0_8px_48px_rgba(248,113,113,0.15)]",
     },
     {
         href: "/roadmaps",
@@ -50,12 +52,21 @@ export default function DashboardPage() {
         email.split("@")[0].replace(/[\._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
     const resolveUsername = async (user: { uid: string; displayName: string | null; email: string | null }) => {
+        const cached = getCachedUsername(user.uid);
+        if (cached) { setUsername(cached); return; }
         try {
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-            if (userDoc.exists() && userDoc.data().username) { setUsername(userDoc.data().username); return; }
+            const name = await fetchUsernameOnce(user.uid, async () => {
+                const userRef = doc(db, "users", user.uid);
+                try {
+                    const cached = await getDocFromCache(userRef);
+                    if (cached.exists() && cached.data().username) return cached.data().username;
+                } catch { /* no cache */ }
+                const userDoc = await getDoc(userRef);
+                if (userDoc.exists() && userDoc.data().username) return userDoc.data().username;
+                return user.displayName || (user.email ? emailFallback(user.email) : null);
+            });
+            if (name) setUsername(name);
         } catch { /* offline */ }
-        if (user.displayName) setUsername(user.displayName);
-        else if (user.email) setUsername(emailFallback(user.email));
     };
 
     useEffect(() => {

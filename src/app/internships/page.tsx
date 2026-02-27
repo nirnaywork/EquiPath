@@ -29,6 +29,10 @@ export default function InternshipsPage() {
     const [skillInput, setSkillInput] = useState("");
     const [skills, setSkills] = useState<string[]>([]);
 
+    // New Search Filters
+    const [isRemote, setIsRemote] = useState(false);
+    const [location, setLocation] = useState<"in" | "us">("in"); // India or Global (US fallback for broader search)
+
     const [hasSearched, setHasSearched] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [jobs, setJobs] = useState<Job[]>([]);
@@ -70,7 +74,7 @@ export default function InternshipsPage() {
             const res = await fetch("/api/jobs", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain, skills })
+                body: JSON.stringify({ domain, skills, country: location, remote: isRemote })
             });
 
             if (!res.ok) throw new Error("API failed");
@@ -135,6 +139,34 @@ export default function InternshipsPage() {
                                 <option value="" disabled>Select domain</option>
                                 {DOMAINS.map(d => <option key={d} value={d}>{d}</option>)}
                             </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground/80 mb-2">Location</label>
+                            <select
+                                title="Location"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value as "in" | "us")}
+                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                            >
+                                <option value="in">🇮🇳 India</option>
+                                <option value="us">🌍 Global</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <div className="relative flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={isRemote}
+                                        onChange={(e) => setIsRemote(e.target.checked)}
+                                        className="peer sr-only"
+                                    />
+                                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500 transition-colors"></div>
+                                </div>
+                                <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">Remote Only</span>
+                            </label>
                         </div>
 
                         <div>
@@ -256,31 +288,31 @@ export default function InternshipsPage() {
                                         </p>
                                     </div>
                                     <div className="grid gap-4">
-                                        <a href={`https://internshala.com/internships/keywords-${encodeURIComponent(domain)}`} target="_blank" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-blue-400/50 transition-colors">
+                                        <a href={`https://internshala.com/internships/keywords-${encodeURIComponent(domain)}${isRemote ? '-work-from-home' : ''}`} target="_blank" rel="noreferrer" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-blue-400/50 transition-colors">
                                             <div>
                                                 <h4 className="font-bold text-lg mb-1 group-hover:text-blue-400 transition-colors">Internshala</h4>
-                                                <p className="text-sm text-foreground/60">{domain} Roles in India</p>
+                                                <p className="text-sm text-foreground/60">{domain} {isRemote ? "Remote " : ""}Roles in {location === "in" ? "India" : "Global"}</p>
                                             </div>
                                             <ExternalLink className="h-6 w-6 text-foreground/30 group-hover:text-blue-400" />
                                         </a>
-                                        <a href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(domain)}`} target="_blank" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-blue-600/50 transition-colors">
+                                        <a href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(domain)}${location === "in" ? "&location=India" : ""}${isRemote ? "&f_WT=2" : ""}`} target="_blank" rel="noreferrer" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-blue-600/50 transition-colors">
                                             <div>
                                                 <h4 className="font-bold text-lg mb-1 group-hover:text-blue-500 transition-colors">LinkedIn Jobs</h4>
-                                                <p className="text-sm text-foreground/60">Global Roles for {domain}</p>
+                                                <p className="text-sm text-foreground/60">{location === "in" ? "Indian" : "Global"} {isRemote ? "Remote " : ""}Roles for {domain}</p>
                                             </div>
                                             <ExternalLink className="h-6 w-6 text-foreground/30 group-hover:text-blue-500" />
                                         </a>
-                                        <a href={`https://wellfound.com/role/${encodeURIComponent(domain.split(' ')[0])}`} target="_blank" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-black/50 transition-colors">
+                                        <a href={`https://wellfound.com/role/${encodeURIComponent(domain.split(' ')[0])}`} target="_blank" rel="noreferrer" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-black/50 transition-colors">
                                             <div>
                                                 <h4 className="font-bold text-lg mb-1 group-hover:text-white transition-colors">WellFound (Startups)</h4>
                                                 <p className="text-sm text-foreground/60">High-growth startups looking for {domain}</p>
                                             </div>
                                             <ExternalLink className="h-6 w-6 text-foreground/30 group-hover:text-white" />
                                         </a>
-                                        <a href={`https://www.freshersworld.com/jobs?skill=${encodeURIComponent(domain)}`} target="_blank" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-green-400/50 transition-colors">
+                                        <a href={`https://www.freshersworld.com/jobs?skill=${encodeURIComponent(domain)}`} target="_blank" rel="noreferrer" className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-green-400/50 transition-colors">
                                             <div>
                                                 <h4 className="font-bold text-lg mb-1 group-hover:text-green-400 transition-colors">FreshersWorld</h4>
-                                                <p className="text-sm text-foreground/60">Entry level jobs specifically tailored for freshers</p>
+                                                <p className="text-sm text-foreground/60">Entry level jobs tailored for freshers</p>
                                             </div>
                                             <ExternalLink className="h-6 w-6 text-foreground/30 group-hover:text-green-400" />
                                         </a>
