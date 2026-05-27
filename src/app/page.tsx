@@ -18,7 +18,7 @@ const features = [
   { icon: Briefcase, label: "Internships & Jobs", color: "text-blue-400" },
 ];
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
@@ -215,5 +215,15 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0A0A0A]" />}>
+      <HomeContent />
+    </Suspense>
   );
 }

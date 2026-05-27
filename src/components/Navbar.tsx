@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Compass, Briefcase, Bell, CalendarClock, LogOut, User as UserIcon, Pencil, Check, X, ChevronDown } from "lucide-react";
+import { Compass, Briefcase, Bell, CalendarClock, LogOut, User as UserIcon, Pencil, Check, X, ChevronDown, LayoutDashboard } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { getCalendarEvents } from "@/lib/calendar";
 import { getCachedUsername, setCachedUsername, clearUserCache, fetchUsernameOnce } from "@/lib/userCache";
@@ -129,6 +129,7 @@ export default function Navbar() {
     const openEdit = () => { setEditValue(username); setEditMode(true); };
 
     const links = [
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/calendar", label: "Calendar", icon: CalendarClock },
         { href: "/roadmaps", label: "Roadmaps", icon: Compass },
         { href: "/internships", label: "Internships", icon: Briefcase },

@@ -1,8 +1,67 @@
-import { CheckCircle2, BookOpen, Trophy, AlertTriangle, ExternalLink, Briefcase } from "lucide-react";
+import { CheckCircle2, BookOpen, Trophy, AlertTriangle, ExternalLink, Briefcase, Plus, Check } from "lucide-react";
 import * as Accordion from "@radix-ui/react-accordion";
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
 // Use explicit generic for data to avoid deep nested type conflicts while pleasing the ESLint
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function RoadmapDisplay({ data, onReset }: { data: Record<string, any>; onReset: () => void }) {
+    const [adding, setAdding] = useState(false);
+    const [added, setAdded] = useState(false);
+    const router = useRouter();
+    const isGuest = typeof window !== "undefined" && localStorage.getItem("guestMode") === "true" && !auth.currentUser;
+
+    const handleAddToDashboard = async () => {
+        if (added || adding) return;
+        setAdding(true);
+
+        try {
+            // Transform roadmap data to dashboard format
+            const phases = (data.roadmap_phases || []).map((phase: Record<string, unknown>) => ({
+                name: `${phase.phase}: ${phase.title}`,
+                completed: false,
+                completedAt: null,
+            }));
+
+            // Use a safe ID without slashes
+            const safeDomain = data.domain.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+            const roadmapPayload = {
+                id: `${safeDomain}-${Date.now()}`,
+                domain: data.domain,
+                year: data.target_year,
+                phases,
+                startedAt: new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }),
+                finishedAt: null,
+                status: "active" as const,
+            };
+
+            if (isGuest) {
+                // Store in localStorage for guests
+                const existing = JSON.parse(localStorage.getItem("guestRoadmaps") || "[]");
+                existing.push(roadmapPayload);
+                localStorage.setItem("guestRoadmaps", JSON.stringify(existing));
+                setAdded(true);
+                setAdding(false);
+                return;
+            }
+
+            const user = auth.currentUser;
+            if (!user) {
+                setAdding(false);
+                return;
+            }
+
+            // Save to Firestore
+            await setDoc(doc(db, "users", user.uid, "roadmaps", roadmapPayload.id), roadmapPayload);
+            setAdded(true);
+        } catch (e) {
+            console.error("Failed to add roadmap:", e);
+        } finally {
+            setAdding(false);
+        }
+    };
 
     if (data.status === "explore") {
         return (
@@ -44,6 +103,32 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
                 </p>
             </div>
 
+            {/* Add to Dashboard Button */}
+            <div className="flex justify-center pt-4 pb-8">
+                {added ? (
+                    <div className="flex items-center gap-2 px-6 py-3 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-sm font-semibold">
+                        <Check className="h-4 w-4" /> Added to Dashboard!
+                    </div>
+                ) : (
+                    <button
+                        onClick={handleAddToDashboard}
+                        disabled={adding}
+                        className="flex items-center gap-2 px-8 py-3 rounded-full bg-accent text-black font-bold text-sm transition-all hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(196,154,108,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {adding ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                Adding...
+                            </>
+                        ) : (
+                            <>
+                                <Plus className="h-4 w-4" /> Add to Dashboard
+                            </>
+                        )}
+                    </button>
+                )}
+            </div>
+
             {/* Timeline Phases */}
             <section className="space-y-6">
                 <h3 className="text-2xl font-bold flex items-center gap-2 border-b border-white/10 pb-2">
@@ -55,17 +140,22 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
                             <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent/20 group-hover:bg-accent transition-colors" />
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                 <div className="space-y-2 flex-1">
-                                    <h4 className="text-xl font-bold">{phase.phase_name as string}</h4>
+                                    <h4 className="text-xl font-bold">{phase.phase as string}: {phase.title as string}</h4>
                                     <div className="flex flex-wrap gap-2 mt-3">
-                                        {(phase.topics_to_learn as string[])?.map((topic: string, j: number) => (
+                                        {(phase.topics as string[])?.map((topic: string, j: number) => (
                                             <span key={j} className="text-xs bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
                                                 {topic}
                                             </span>
                                         ))}
                                     </div>
+                                    {(phase.milestone as string) && (
+                                        <p className="mt-3 text-sm text-accent/80 font-semibold flex items-center gap-1">
+                                            🎯 Milestone: {phase.milestone as string}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="shrink-0 text-sm font-mono text-accent/80 bg-accent/10 px-3 py-1 rounded-lg self-start">
-                                    ⏱️ {phase.estimated_timeframe as string}
+                                    ⏱️ {phase.timeframe as string}
                                 </div>
                             </div>
                         </div>
@@ -83,10 +173,17 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
                     {/* Minor Projects */}
                     <div className="space-y-4">
                         <h4 className="text-lg font-semibold text-foreground/80">Minor Projects</h4>
-                        {(data.projects?.minor_projects as Record<string, unknown>[])?.map((proj: Record<string, unknown>, i: number) => (
+                        {(data.projects?.minor as Record<string, unknown>[])?.map((proj: Record<string, unknown>, i: number) => (
                             <div key={i} className="glass p-5 rounded-xl border-l-2 border-l-white/20">
                                 <h5 className="font-bold mb-1">{proj.title as string}</h5>
-                                <p className="text-sm text-foreground/60">{proj.description as string}</p>
+                                <p className="text-sm text-foreground/60 mb-3">{proj.description as string}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {(proj.tech_stack as string[])?.map((tech: string, j: number) => (
+                                        <span key={j} className="text-xs bg-white/10 text-white/80 px-2 py-1 rounded-md">
+                                            {tech}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -99,15 +196,25 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
                                 <Trophy className="h-24 w-24" />
                             </div>
                             <div className="relative z-10">
-                                <h5 className="text-xl font-bold text-yellow-400 mb-2">{data.projects?.major_project?.title as string}</h5>
-                                <p className="text-foreground/80 mb-4">{data.projects?.major_project?.description as string}</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {data.projects?.major_project?.key_technologies?.map((tech: string, i: number) => (
+                                <h5 className="text-xl font-bold text-yellow-400 mb-2">{data.projects?.major?.title as string}</h5>
+                                <p className="text-foreground/80 mb-4">{data.projects?.major?.description as string}</p>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {(data.projects?.major?.tech_stack as string[])?.map((tech: string, i: number) => (
                                         <span key={i} className="text-xs bg-yellow-500/20 text-yellow-200 px-2 py-1 rounded-md">
                                             {tech}
                                         </span>
                                     ))}
                                 </div>
+                                {((data.projects?.major?.features as string[])?.length > 0) && (
+                                    <div className="space-y-1">
+                                        <h6 className="text-sm font-bold text-yellow-500/80 mb-1">Features:</h6>
+                                        {(data.projects?.major?.features as string[])?.map((feat: string, i: number) => (
+                                            <div key={i} className="text-sm text-yellow-100/70 flex items-start gap-2">
+                                                <span className="text-yellow-500/50 mt-1">•</span> {feat}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -128,7 +235,7 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
                                     <div className="text-xs text-foreground/50">{res.type as string}</div>
                                 </div>
                                 <a
-                                    href={(res.url_or_search_term as string).startsWith('http') ? (res.url_or_search_term as string) : `https://www.google.com/search?q=${encodeURIComponent(res.url_or_search_term as string)}`}
+                                    href={(res.url as string).startsWith('http') ? (res.url as string) : `https://www.google.com/search?q=${encodeURIComponent(res.url as string)}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="text-blue-400 opacity-50 group-hover:opacity-100 transition-opacity p-2"
@@ -139,7 +246,6 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
                         ))}
                     </ul>
                 </section>
-
                 <section className="space-y-6">
                     <h3 className="text-2xl font-bold flex items-center gap-2 border-b border-white/10 pb-2">
                         <AlertTriangle className="text-red-400" /> Risks &amp; Challenges
@@ -162,35 +268,37 @@ export default function RoadmapDisplay({ data, onReset }: { data: Record<string,
             </div>
 
             {/* 3rd/4th Year Internship Strategy */}
-            {data.internship_strategy && (
-                <section className="mt-12 glass p-8 rounded-3xl border-2 border-secondary-glow/30 bg-secondary-glow/5">
-                    <h3 className="text-2xl font-bold text-indigo-400 mb-4 flex items-center gap-2">
-                        <Briefcase className="h-6 w-6" /> Internship & Job Strategy
-                    </h3>
-                    <p className="text-foreground/80 leading-relaxed mb-6">
-                        {data.internship_strategy}
-                    </p>
+            {
+                data.internship_strategy && (
+                    <section className="mt-12 glass p-8 rounded-3xl border-2 border-secondary-glow/30 bg-secondary-glow/5">
+                        <h3 className="text-2xl font-bold text-indigo-400 mb-4 flex items-center gap-2">
+                            <Briefcase className="h-6 w-6" /> Internship & Job Strategy
+                        </h3>
+                        <p className="text-foreground/80 leading-relaxed mb-6">
+                            {data.internship_strategy}
+                        </p>
 
-                    <h4 className="text-sm font-bold text-foreground/50 uppercase tracking-wider mb-3">Deep Links (Auto-Filtered)</h4>
-                    <div className="flex flex-wrap gap-3">
-                        <a href={`https://internshala.com/internships/keywords-${encodeURIComponent(data.domain)}`} target="_blank" className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
-                            Internshala <ExternalLink className="h-3 w-3" />
-                        </a>
-                        <a href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(data.domain)}`} target="_blank" className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
-                            LinkedIn <ExternalLink className="h-3 w-3" />
-                        </a>
-                        <a href={`https://wellfound.com/role/${encodeURIComponent(data.domain.split(' ')[0])}`} target="_blank" className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
-                            WellFound <ExternalLink className="h-3 w-3" />
-                        </a>
-                    </div>
-                </section>
-            )}
+                        <h4 className="text-sm font-bold text-foreground/50 uppercase tracking-wider mb-3">Deep Links (Auto-Filtered)</h4>
+                        <div className="flex flex-wrap gap-3">
+                            <a href={`https://internshala.com/internships/keywords-${encodeURIComponent(data.domain)}`} target="_blank" className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
+                                Internshala <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <a href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(data.domain)}`} target="_blank" className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
+                                LinkedIn <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <a href={`https://wellfound.com/role/${encodeURIComponent(data.domain.split(' ')[0])}`} target="_blank" className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
+                                WellFound <ExternalLink className="h-3 w-3" />
+                            </a>
+                        </div>
+                    </section>
+                )
+            }
 
             <div className="pt-8 text-center border-t border-white/10">
                 <button onClick={onReset} className="text-foreground/50 hover:text-white transition-colors">
                     Start New Roadmap
                 </button>
             </div>
-        </div>
+        </div >
     );
 }

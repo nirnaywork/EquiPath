@@ -1,55 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
+import dynamic from "next/dynamic";
+import { auth, db } from "@/lib/firebase";
 import { getCachedUsername, fetchUsernameOnce } from "@/lib/userCache";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, getDocFromCache } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { CalendarClock, Compass, Briefcase, ArrowRight } from "lucide-react";
+import { doc, getDoc, getDocFromCache, collection, getDocs } from "firebase/firestore";
+import ResumeSection from "@/components/dashboard/ResumeSection";
+import SkillsSection from "@/components/dashboard/SkillsSection";
+import RoadmapSection from "@/components/dashboard/RoadmapSection";
+import PortfolioLinkSection from "@/components/dashboard/PortfolioLinkSection";
+import type { ChartDataPoint } from "@/components/dashboard/ProgressChart";
+import { setDoc } from "firebase/firestore";
+import { UnifiedCalendarEvent, addUnifiedCalendarEvent, getUnifiedCalendarEvents, COLORS } from "@/lib/calendarUnified";
+import { Link2, Copy, Eye, Lock, Unlock } from "lucide-react";
 
-const features = [
-    {
-        href: "/calendar",
-        icon: CalendarClock,
-        label: "Smart Calendar",
-        description: "AI-powered tracker for exams, deadlines, and smart email reminders.",
-        color: "text-red-400",
-        border: "hover:border-red-400/30",
-        bg: "bg-red-500/10",
-        glow: "hover:shadow-[0_8px_48px_rgba(248,113,113,0.15)]",
-    },
-    {
-        href: "/roadmaps",
-        icon: Compass,
-        label: "Roadmaps",
-        description: "Get a personalized CS learning path scoped to your year and domain.",
-        color: "text-blue-400",
-        border: "hover:border-blue-400/30",
-        bg: "bg-blue-500/10",
-        glow: "hover:shadow-[0_8px_48px_rgba(96,165,250,0.15)]",
-    },
-    {
-        href: "/internships",
-        icon: Briefcase,
-        label: "Internships",
-        description: "Discover live internship and job listings matched to your skills.",
-        color: "text-violet-400",
-        border: "hover:border-violet-400/30",
-        bg: "bg-violet-500/10",
-        glow: "hover:shadow-[0_8px_48px_rgba(167,139,250,0.15)]",
-    },
-];
+// Dynamic imports for chart libs (avoid SSR issues)
+const ProgressChart = dynamic(() => import("@/components/dashboard/ProgressChart"), { ssr: false });
+const CalendarSection = dynamic(() => import("@/components/dashboard/CalendarSection"), { ssr: false });
 
 export default function DashboardPage() {
     const router = useRouter();
     const [username, setUsername] = useState("");
     const [titleReady, setTitleReady] = useState(false);
+    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+    const isGuest = typeof window !== "undefined" && localStorage.getItem("guestMode") === "true" && !auth.currentUser;
 
     const emailFallback = (email: string) =>
-        email.split("@")[0].replace(/[\._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
     const resolveUsername = async (user: { uid: string; displayName: string | null; email: string | null }) => {
         const cached = getCachedUsername(user.uid);
@@ -69,11 +48,27 @@ export default function DashboardPage() {
         } catch { /* offline */ }
     };
 
+    // Load existing chart data from Firestore/localStorage
+    const loadExistingData = useCallback(async () => {
+        if (isGuest) {
+            const cachedChart = localStorage.getItem("guestChartData");
+            if (cachedChart) setChartData(JSON.parse(cachedChart));
+            return;
+        }
+        const user = auth.currentUser;
+        if (!user) return;
+        try {
+            // Load chart data points
+            const chartSnap = await getDocs(collection(db, "users", user.uid, "chartData"));
+            setChartData(chartSnap.docs.map(d => d.data() as ChartDataPoint));
+        } catch { }
+    }, [isGuest]);
+
     useEffect(() => {
-        const isGuest = typeof window !== "undefined" && localStorage.getItem("guestMode") === "true";
-        if (isGuest && !auth.currentUser) {
+        if (isGuest) {
             setUsername("Guest");
             setTimeout(() => setTitleReady(true), 80);
+            loadExistingData();
         }
 
         const cached = auth.currentUser;
@@ -82,13 +77,17 @@ export default function DashboardPage() {
             else if (cached.email) setUsername(emailFallback(cached.email));
             setTimeout(() => setTitleReady(true), 80);
             resolveUsername(cached);
+            loadExistingData();
         }
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 const stillGuest = typeof window !== "undefined" && localStorage.getItem("guestMode") === "true";
                 if (!stillGuest) { router.replace("/"); return; }
-                if (stillGuest && !titleReady) { setUsername("Guest"); setTimeout(() => setTitleReady(true), 80); }
+                if (stillGuest && !titleReady) {
+                    setUsername("Guest");
+                    setTimeout(() => setTitleReady(true), 80);
+                }
                 return;
             }
             localStorage.removeItem("guestMode");
@@ -97,6 +96,7 @@ export default function DashboardPage() {
                 else if (user.email) setUsername(emailFallback(user.email));
                 setTimeout(() => setTitleReady(true), 80);
                 resolveUsername(user);
+                loadExistingData();
             }
         });
 
@@ -104,9 +104,41 @@ export default function DashboardPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
 
+    // Called when a phase is checked in RoadmapSection
+    const handlePhaseComplete = async (
+        roadmapId: string, domain: string, phaseName: string, date: string, progress: number
+    ) => {
+        // Add chart data point
+        const newPoint: ChartDataPoint = { date, roadmapId, domain, phaseName, progress };
+        setChartData(prev => {
+            const updated = [...prev, newPoint];
+            if (isGuest) localStorage.setItem("guestChartData", JSON.stringify(updated));
+            return updated;
+        });
+
+        // Add calendar event to unified storage
+        const dateStr = new Date(date).toISOString().split("T")[0];
+        addUnifiedCalendarEvent({
+            date: dateStr,
+            title: `Completed ${phaseName} of ${domain} Roadmap`,
+            type: "roadmap",
+            color: COLORS.roadmap,
+            roadmapId,
+        });
+
+        // Persist chart data to Firestore
+        if (!isGuest) {
+            const user = auth.currentUser;
+            if (user) {
+                const eventId = `${roadmapId}_${Date.now()}`;
+                await setDoc(doc(db, "users", user.uid, "chartData", eventId), newPoint).catch(() => { });
+            }
+        }
+    };
+
     return (
         <div className="flex flex-col min-h-screen relative overflow-hidden">
-            {/* ── Background ── */}
+            {/* Background */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div className="orb w-[700px] h-[700px] bg-accent/7 -top-48 left-1/2 -translate-x-1/2" />
                 <div className="orb w-[400px] h-[400px] bg-blue-500/5 bottom-24 -left-20" />
@@ -115,58 +147,59 @@ export default function DashboardPage() {
                     style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
             </div>
 
-            {/* ── Hero ── */}
-            <section className="relative flex flex-col items-center justify-center min-h-[70vh] px-4 text-center">
-                <div className={`flex flex-col items-center gap-6 transition-all duration-700 ease-out ${titleReady ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent/20 bg-accent/8">
+            {/* Header */}
+            <section className="relative px-4 sm:px-6 lg:px-8 pt-12 pb-4 max-w-7xl mx-auto w-full">
+                <div className={`transition-all duration-700 ease-out ${titleReady ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent/20 bg-accent/8 mb-4">
                         <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                        <span className="section-label">Welcome back, {username || "…"}</span>
+                        <span className="section-label">Dashboard</span>
                     </div>
-
-                    <h1 className="text-[clamp(2.8rem,8vw,6rem)] font-extrabold tracking-tight leading-none" style={{ fontFamily: "var(--font-syne)" }}>
-                        Your CS Career,{" "}
-                        <span className="text-gradient">Engineered.</span>
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight" style={{ fontFamily: "var(--font-syne)" }}>
+                        Welcome back, <span className="text-gradient">{username || "…"}</span>
                     </h1>
-
-                    <p className="text-lg text-foreground/45 max-w-xl leading-relaxed">
-                        Everything you need to plan, learn, and land your dream role — all in one place.
-                    </p>
-
-                    <button
-                        onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-                        className="mt-4 flex flex-col items-center gap-2 text-foreground/30 hover:text-accent transition-colors duration-200"
-                    >
-                        <span className="text-xs uppercase tracking-[0.2em]">Choose your path</span>
-                        <div className="w-px h-8 bg-gradient-to-b from-foreground/20 to-transparent" />
-                    </button>
+                    <p className="mt-2 text-foreground/45 text-sm">Your personal command center for tracking progress, managing skills, and staying organized.</p>
                 </div>
             </section>
 
-            {/* ── Feature Cards ── */}
-            <section id="features" className="container mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                    {features.map((f, i) => {
-                        const Icon = f.icon;
-                        return (
-                            <Link
-                                key={f.href}
-                                href={f.href}
-                                className={`group glass-hover rounded-3xl p-8 border border-transparent ${f.border} ${f.glow} flex flex-col gap-6 transition-all duration-300 opacity-0 animate-fade-up`}
-                                style={{ animationDelay: `${200 + i * 100}ms`, animationFillMode: "both" }}
-                            >
-                                <div className={`inline-flex w-fit rounded-2xl ${f.bg} p-4 ${f.color}`}>
-                                    <Icon className="h-7 w-7" />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className={`text-lg font-bold mb-2 ${f.color}`}>{f.label}</h3>
-                                    <p className="text-sm text-foreground/50 leading-relaxed">{f.description}</p>
-                                </div>
-                                <div className={`flex items-center gap-1.5 text-sm font-semibold ${f.color} opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0`}>
-                                    Open <ArrowRight className="h-4 w-4" />
-                                </div>
-                            </Link>
-                        );
-                    })}
+            {/* Portfolio Link Section */}
+            {!isGuest && (
+                <section className="relative px-4 sm:px-6 lg:px-8 pb-6 max-w-7xl mx-auto w-full">
+                    <PortfolioLinkSection username={username} user={auth.currentUser} />
+                </section>
+            )}
+
+            {/* Guest Banner */}
+            {isGuest && (
+                <div className="relative max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mb-6">
+                    <div className="px-5 py-3 rounded-2xl bg-accent/8 border border-accent/20 text-sm text-accent/90 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                        Create a free account to save your progress forever.
+                        <a href="/?login=true" className="ml-auto text-accent font-semibold underline underline-offset-2 text-xs">Sign Up</a>
+                    </div>
+                </div>
+            )}
+
+            {/* Dashboard Grid */}
+            <section className="relative flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-16">
+                {/* Row 1: Resume + Skills */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <ResumeSection />
+                    <SkillsSection />
+                </div>
+
+                {/* Row 2: Roadmap Management */}
+                <div className="mb-6">
+                    <RoadmapSection onPhaseComplete={handlePhaseComplete} />
+                </div>
+
+                {/* Row 3: Progress Chart */}
+                <div className="mb-6">
+                    <ProgressChart dataPoints={chartData} />
+                </div>
+
+                {/* Row 4: Calendar */}
+                <div>
+                    <CalendarSection />
                 </div>
             </section>
         </div>

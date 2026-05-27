@@ -1,0 +1,21 @@
+src/lib/hardcodedRoadmaps.ts(2,48): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(137,57): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(274,31): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(404,22): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(536,20): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(667,19): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(800,24): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(931,19): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1058,31): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1176,42): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1306,23): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1436,34): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1568,27): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1699,34): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1829,28): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(1960,28): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(2090,19): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(2222,30): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(2344,15): error TS1005: ';' expected.
+src/lib/hardcodedRoadmaps.ts(2372,1): error TS1128: Declaration or statement expected.
+src/lib/hardcodedRoadmaps.ts(2372,3): error TS1127: Invalid character.

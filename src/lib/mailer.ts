@@ -8,7 +8,7 @@ export const transporter = nodemailer.createTransport({
     },
 });
 
-export const sendEmail = async (to: string, subject: string, html: string) => {
+export async function sendEmail(to: string, subject: string, html: string) {
     try {
         const info = await transporter.sendMail({
             from: `"EquiPath" <${process.env.GMAIL_USER}>`,
@@ -16,9 +16,9 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
             subject,
             html,
         });
-        return { success: true, info };
+        return { success: true as const, info };
     } catch (error) {
         console.error("Error sending email:", error);
-        return { success: false, error };
+        return { success: false as const, error };
     }
-};
+}

@@ -42,10 +42,9 @@ export default function RoadmapsPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                const message = data.quotaExceeded
-                    ? "Daily AI limit reached. Try again tomorrow or check your Gemini API plan."
-                    : (data.details || data.error || "Failed to generate roadmap");
-                throw new Error(message);
+                // Fixed: always show user-friendly message for Groq failures
+                const message = "Our AI is experiencing high demand at the moment — please check back in a few hours.";
+                throw new Error(typeof data?.error === "string" ? data.error : message);
             }
 
             setRoadmapData(data);

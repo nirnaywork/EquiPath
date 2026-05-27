@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendEmail } from "@/lib/mailer";
 
 // To make this secure, Vercel sets cron headers. Or you can require a simple hardcoded secret query param.
 // E.g., /api/cron/process-reminders?secret=YOUR_CRON_SECRET
@@ -31,6 +32,8 @@ export async function GET(req: Request) {
             const usersSnap = await db.collection("users").get();
         */
 
+        // Fixed: restore Nodemailer-based email dispatch
+
         const mockedEvents = [
             { id: "e1", title: "Data Structures Final", date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), remindersSent: { "1w": false } },
             { id: "e2", title: "Microsoft Intern Deadline", date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), remindersSent: { "3d": false } },
@@ -39,6 +42,12 @@ export async function GET(req: Request) {
 
         let remindersSentCount = 0;
 
+        const to = process.env.GMAIL_USER;
+        if (!to) {
+            // Fixed: avoid throwing if SMTP isn't configured; keep endpoint functional
+            console.warn("[CRON] GMAIL_USER missing; skipping email dispatch");
+        }
+
         for (const event of mockedEvents) {
             const now = new Date();
             const diffDays = (event.date.getTime() - now.getTime()) / (1000 * 3600 * 24);
@@ -46,19 +55,19 @@ export async function GET(req: Request) {
             // 1 Week Reminder
             if (diffDays <= 7 && diffDays > 3 && !event.remindersSent["1w"]) {
                 console.log(`[EMAIL DISPATCH] Mock sending 1-Week Warning for: ${event.title}`);
-                // await sendEmail(user.email, event.title, "1 week away");
+                if (to) await sendEmail(to, `Reminder: ${event.title} (1 week away)`, `<p><strong>${event.title}</strong> is 1 week away.</p>`);
                 remindersSentCount++;
             }
             // 3 Day Reminder
             else if (diffDays <= 3 && diffDays > 1 && !event.remindersSent["3d"]) {
                 console.log(`[EMAIL DISPATCH] Mock sending 3-Day Warning for: ${event.title}`);
-                // await sendEmail(user.email, event.title, "3 days away");
+                if (to) await sendEmail(to, `Reminder: ${event.title} (3 days away)`, `<p><strong>${event.title}</strong> is 3 days away.</p>`);
                 remindersSentCount++;
             }
             // 1 Day Reminder
             else if (diffDays <= 1 && diffDays > 0 && !event.remindersSent["1d"]) {
                 console.log(`[EMAIL DISPATCH] Mock sending 1-Day Warning for: ${event.title}`);
-                // await sendEmail(user.email, event.title, "Tomorrow!");
+                if (to) await sendEmail(to, `Reminder: ${event.title} (tomorrow)`, `<p><strong>${event.title}</strong> is tomorrow.</p>`);
                 remindersSentCount++;
             }
         }

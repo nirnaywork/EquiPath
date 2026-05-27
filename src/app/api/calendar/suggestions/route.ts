@@ -1,10 +1,76 @@
 import { NextResponse } from "next/server";
 
+const HIGH_DEMAND_MSG = "Our AI is experiencing high demand at the moment — please check back in a few hours."; // Fixed: consistent user-facing fallback
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+// Fixed: llama3-70b-8192 was decommissioned by Groq; use supported replacements
+const MODEL_CANDIDATES = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"] as const;
+
+type SuggestionPriority = "low" | "medium" | "high" | "critical";
+
+type InputEvent = {
+    title?: string;
+    type?: string;
+    date?: string;
+    priority?: string;
+    metadata?: unknown;
+};
+
+type SuggestionsRequest = {
+    events?: InputEvent[];
+    timezone?: string;
+};
+
+async function callGroqJson(messages: { role: "system" | "user"; content: string }[]): Promise<unknown> {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+        throw new Error("Missing GROQ_API_KEY");
+    }
+
+    const payloadBase = {
+        messages,
+        response_format: { type: "json_object" as const },
+        temperature: 0.6,
+    };
+
+    const attempt = async (model: string) => {
+        const res = await fetch(GROQ_ENDPOINT, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ ...payloadBase, model }),
+        });
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            const err = new Error(`Groq API returned ${res.status}: ${text}`);
+            (err as any).status = res.status;
+            throw err;
+        }
+
+        return res.json() as Promise<any>;
+    };
+
+    let lastError: unknown = null;
+    for (const model of MODEL_CANDIDATES) {
+        try {
+            const data = await attempt(model);
+            const content: unknown = data?.choices?.[0]?.message?.content;
+            if (typeof content !== "string" || !content.trim()) throw new Error(`No content returned from Groq (${model})`);
+            return JSON.parse(content);
+        } catch (err: unknown) {
+            lastError = err;
+            continue;
+        }
+    }
+
+    throw lastError ?? new Error("Groq request failed");
+}
+
 export async function POST(req: Request) {
     try {
-        const apiKey = process.env.DEEPSEEK_API_KEY || "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";
-
-        let requestData: { events?: any[], timezone?: string } = {};
+        let requestData: SuggestionsRequest = {};
         try {
             requestData = await req.json();
         } catch {
@@ -20,7 +86,7 @@ export async function POST(req: Request) {
         if (events.length === 0) {
             return NextResponse.json({
                 suggestions: [
-                    { title: "Quiet Week Ahead", description: "No upcoming deadlines. Take this time to rest or get ahead on long-term projects.", priority: "low" }
+                    { title: "Quiet Week Ahead", description: "No upcoming deadlines. Take this time to rest or get ahead on long-term projects.", priority: "low" satisfies SuggestionPriority }
                 ]
             });
         }
@@ -31,53 +97,15 @@ Return exactly this JSON structure: { "suggestions": [ { "title": "string", "des
 
         const prompt = `Current Timezone: ${timezone || "UTC"}\nCurrent Date ISO: ${new Date().toISOString()}\nUpcoming Events (JSON):\n${JSON.stringify(events, null, 2)}\n\nAnalyze these events. Look for clustering (e.g., 3 exams in a week), high-priority deadlines approaching, or low syllabus coverage on soon-to-be exams. Generate 1-3 highly specific, panic-preventing suggestions based ONLY on this schedule.`;
 
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "deepseek/deepseek-chat",
-                messages: [
-                    { role: "system", content: systemInstruction },
-                    { role: "user", content: prompt }
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.6,
-            })
-        });
+        const parsed = await callGroqJson([
+            { role: "system", content: systemInstruction },
+            { role: "user", content: prompt },
+        ]);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Deepseek Suggestions API Error:", response.status, errorText);
-
-            // Check for rate limit error from OpenRouter
-            if (response.status === 429) {
-                return NextResponse.json(
-                    { error: "Daily AI limit reached. Insights will be back after your quota resets.", quotaExceeded: true },
-                    { status: 429 }
-                );
-            }
-            throw new Error(`API returned status ${response.status}`);
-        }
-
-        const resultData = await response.json();
-        const text = resultData.choices?.[0]?.message?.content;
-
-        if (!text) {
-            throw new Error("No text returned from API");
-        }
-
-        try {
-            const parsed = JSON.parse(text);
-            return NextResponse.json(parsed);
-        } catch {
-            console.error("Failed to parse Deepseek output as JSON", text);
-            return NextResponse.json({ error: "Invalid response format from AI" }, { status: 500 });
-        }
+        return NextResponse.json(parsed);
     } catch (error: unknown) {
         console.error("Suggestions API Error:", error);
-        return NextResponse.json({ error: "Failed to generate suggestions" }, { status: 500 });
+        // Fixed: user-friendly message for any Groq failure
+        return NextResponse.json({ error: HIGH_DEMAND_MSG }, { status: 503 });
     }
 }

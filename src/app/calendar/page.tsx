@@ -33,6 +33,7 @@ export default function CalendarPage() {
     const [suggestions, setSuggestions] = useState<{ title: string, description: string, priority: string }[]>([]);
     const [loadingAI, setLoadingAI] = useState(false);
     const [suggestionQuotaExceeded, setSuggestionQuotaExceeded] = useState(false);
+    const [suggestionError, setSuggestionError] = useState<string | null>(null); // Fixed: show user-friendly AI errors in UI
 
     useEffect(() => {
         const user = auth.currentUser;
@@ -78,6 +79,7 @@ export default function CalendarPage() {
         if (currentEvents.length === 0) return;
         setLoadingAI(true);
         setSuggestionQuotaExceeded(false);
+        setSuggestionError(null);
         try {
             const upcoming = currentEvents.filter(e => e.date >= new Date());
             const payload = upcoming.map(e => ({
@@ -97,11 +99,17 @@ export default function CalendarPage() {
             if (res.ok) {
                 const data = await res.json();
                 setSuggestions(data.suggestions || []);
-            } else if (res.status === 429) {
-                setSuggestionQuotaExceeded(true);
+            } else {
+                // Fixed: Groq failures must show a clear message on screen
+                const data = await res.json().catch(() => ({}));
+                const msg = typeof (data as any)?.error === "string"
+                    ? (data as any).error
+                    : "Our AI is experiencing high demand at the moment — please check back in a few hours.";
+                setSuggestionError(msg);
             }
         } catch (e) {
             console.error("AI Insight Error:", e);
+            setSuggestionError("Our AI is experiencing high demand at the moment — please check back in a few hours.");
         } finally {
             setLoadingAI(false);
         }
@@ -179,10 +187,10 @@ export default function CalendarPage() {
             </div>
 
             {/* AI Insights Banner */}
-            {suggestionQuotaExceeded && !loadingAI && (
-                <div className="mb-8 glass border border-amber-500/20 bg-amber-500/5 rounded-3xl p-6 sm:p-8">
-                    <p className="text-amber-200/90 text-sm">
-                        <strong>Engine Insights</strong> — Daily AI limit reached. Insights will be back when your quota resets.
+            {suggestionError && !loadingAI && (
+                <div className="mb-8 glass border border-red-500/20 bg-red-500/5 rounded-3xl p-6 sm:p-8">
+                    <p className="text-red-200/90 text-sm">
+                        <strong>Engine Insights</strong> — {suggestionError}
                     </p>
                 </div>
             )}
