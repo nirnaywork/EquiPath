@@ -147,7 +147,7 @@ export default function Navbar() {
             }`}>
             <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-7xl">
                 {/* Logo */}
-                <Link href={user || isGuest ? "/dashboard" : "/"} className="group flex items-center gap-2">
+                <Link href="/" className="group flex items-center gap-2">
                     <span className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-syne)" }}>
                         <span className="text-gradient">Equi</span>
                         <span className="text-foreground">Path</span>
